@@ -1,0 +1,23 @@
+{
+  "name": "immutable-audit-log-service",
+  "version": "1.0.0",
+  "description": "REST API service that records audit events into one permanent, queryable record — a record that can be written and read, but never updated or deleted.",
+  "license": "ISC",
+  "author": "Vincent",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "custom-env": "^2.0.6",
+    "express": "^5.2.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.0.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
