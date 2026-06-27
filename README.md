@@ -307,3 +307,46 @@ Not found response:
   ]
 }
 ```
+## Phase 4 API
+
+### Bulk Insert
+
+Record multiple events in a single request with `POST /events/bulk`. The batch is capped at 100 events and is atomic — either every event is written or none is.
+
+```bash
+curl -X POST http://localhost:3000/events/bulk \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "actor_id": "user_123",
+      "action": "CREATE",
+      "resource_type": "document",
+      "resource_id": "doc-1"
+    },
+    {
+      "actor_id": "user_123",
+      "action": "UPDATE",
+      "resource_type": "document",
+      "resource_id": "doc-2",
+      "before_state": { "title": "Old" },
+      "after_state": { "title": "New" }
+    }
+  ]'
+```
+
+Successful response:
+
+```json
+{
+  "ok": true,
+  "inserted": 2,
+  "events": [...],
+  "errors": []
+}
+```
+
+A batch larger than 100 events or an empty batch is rejected with `400` before anything is written.
+
+### Why Atomic?
+
+A partial batch is more dangerous than no batch for an audit log. If 3 out of 5 events are written and the rest fail, the log will contain unnoticeable gaps. An auditor reading the log would have no way of knowing that data is missing. The transaction ensures the log is either complete or untouched—there is no in-between.

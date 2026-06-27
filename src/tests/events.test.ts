@@ -90,8 +90,84 @@ describe("GET /events/:id", () => {
     expect(res.body.ok).toBe(false);
   });
 });
-it('returns empty list when offset is beyond total records', async () => {
-  const res = await request(app).get('/events?offset=99999')
-  expect(res.status).toBe(200)
-  expect(res.body.events).toEqual([])
-})
+it("returns empty list when offset is beyond total records", async () => {
+  const res = await request(app).get("/events?offset=99999");
+  expect(res.status).toBe(200);
+  expect(res.body.events).toEqual([]);
+});
+
+describe("POST /events/bulk", () => {
+  it("returns 201 with inserted count when batch is valid", async () => {
+    const res = await request(app)
+      .post("/events/bulk")
+      .send([
+        {
+          actor_id: "user-123",
+          action: "CREATE",
+          resource_type: "document",
+          resource_id: "doc-1",
+        },
+        {
+          actor_id: "user-123",
+          action: "UPDATE",
+          resource_type: "document",
+          resource_id: "doc-2",
+          before_state: { title: "Old" },
+          after_state: { title: "New" },
+        },
+      ]);
+
+    expect(res.status).toBe(201);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.inserted).toBe(2);
+    expect(res.body.events).toHaveLength(2);
+  });
+
+  it("returns 400 when batch exceeds 100 events", async () => {
+    const batch = Array.from({ length: 101 }, (_, i) => ({
+      actor_id: "user-123",
+      action: "CREATE",
+      resource_type: "document",
+      resource_id: `doc-${i}`,
+    }));
+
+    const res = await request(app).post("/events/bulk").send(batch);
+
+    expect(res.status).toBe(400);
+    expect(res.body.ok).toBe(false);
+  });
+
+  it("returns 400 when batch is empty", async () => {
+    const res = await request(app).post("/events/bulk").send([]);
+
+    expect(res.status).toBe(400);
+    expect(res.body.ok).toBe(false);
+  });
+
+  it("returns 400 and writes nothing when one event is invalid", async () => {
+    const countBefore = (await request(app).get("/events")).body.total;
+
+    const res = await request(app)
+      .post("/events/bulk")
+      .send([
+        {
+          actor_id: "user-123",
+          action: "CREATE",
+          resource_type: "document",
+          resource_id: "doc-valid",
+        },
+        {
+          actor_id: "",
+          action: "CREATE",
+          resource_type: "document",
+          resource_id: "doc-invalid",
+        },
+      ]);
+
+    const countAfter = (await request(app).get("/events")).body.total;
+
+    expect(res.status).toBe(400);
+    expect(res.body.ok).toBe(false);
+    expect(countAfter).toBe(countBefore);
+  });
+});

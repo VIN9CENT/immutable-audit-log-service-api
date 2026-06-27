@@ -1,12 +1,13 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
-import { createEventSchema } from "../validators/event.validator";
-import { recordEvent, fetchEvents, fetchEventById } from "../services/events.service";
+import { createBulkEventSchema, createEventSchema } from "../validators/event.validator";
+import { recordEvent, fetchEvents, fetchEventById, recordBulkEvents } from "../services/events.service";
 import {
   eventErrorResponse,
   eventSuccessResponse,
   eventsSuccessResponse,
   type ApiError,
+  bulkEventSuccessResponse
 } from "../utils/responses";
 import type { FilterType } from '../repositories/events.repository'
 
@@ -81,6 +82,32 @@ export async function createEvent(req: Request, res: Response) {
     }]))
   }
 }
+
+export const  createBulkEvents = async(req:Request, res:Response)=>{
+const result  = createBulkEventSchema.safeParse(req.body);
+if(!result.success){
+  return res.status(400).json(eventErrorResponse (formatValidationErrors(result.error, req.body)))
+}
+
+ try {
+    const events = await recordBulkEvents(result.data, {
+  ip_address: req.ip ?? req.socket.remoteAddress ?? null,
+  user_agent: req.headers['user-agent'] ?? null,
+});
+return res.status(201).json(bulkEventSuccessResponse(events));
+  } catch (err) {
+    return res.status(500).json(eventErrorResponse([{
+      field: '',
+      message: 'Failed to save events',
+      code: 'DATABASE_ERROR'
+    }]))
+  }
+
+}
+
+
+
+
 
 export async function getAllEvents(req: Request, res: Response) {
   try {

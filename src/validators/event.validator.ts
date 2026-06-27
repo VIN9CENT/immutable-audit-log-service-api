@@ -29,4 +29,7 @@ export const createEventSchema = z.object({
   after_state: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
+export const createBulkEventSchema = z.array(createEventSchema).min(1, "Batch must contain at least one event.").max(100, "Batch cannot exceed 100 events.")
+
 export type CreateEventInput = z.infer<typeof createEventSchema>;
+export type CreateBulkInput = z.infer<typeof createBulkEventSchema>

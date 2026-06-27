@@ -26,6 +26,26 @@ export const psqlEventRepository = async (event: NewEvent): Promise<Event> => {
   return saved
 }
 
+export const psqlBulkEventRepository = async (newEvents: NewEvent[]): Promise<Event[]> => {
+  return await db.transaction(async (tx) => {
+    const saved = await tx.insert(events).values(newEvents).returning()
+    return saved
+  })
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export const getEvents = async (filters: FilterType): Promise<QueryResult> => {
   const limit = filters.limit ?? 20  
   const offset = filters.offset ?? 0
