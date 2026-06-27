@@ -58,14 +58,24 @@ function formatValidationErrors(error: ZodError, body: unknown): ApiError[] {
   }));
 }
 
-export function createEvent(req: Request, res: Response) {
+export async function createEvent(req: Request, res: Response) {
   const result = createEventSchema.safeParse(req.body);
 
   if (!result.success) {
     return res.status(400).json(eventErrorResponse(formatValidationErrors(result.error, req.body)));
   }
 
-  const event = recordEvent(result.data);
-
-  return res.status(201).json(eventSuccessResponse(event));
+  try {
+    const event = await recordEvent(result.data, {
+      ip_address: req.ip ?? req.socket.remoteAddress ?? null,
+      user_agent: req.headers['user-agent'] ?? null,
+    });
+    return res.status(201).json(eventSuccessResponse(event));
+  } catch (err) {
+    return res.status(500).json(eventErrorResponse([{
+      field: '',
+      message: 'Failed to save event',
+      code: 'DATABASE_ERROR'
+    }]))
+  }
 }
