@@ -2,7 +2,7 @@
 
 ## What This Service Does
 
-This service records audit events in a permanent, queryable log. Events can be written and read, but they cannot be updated or deleted through the API. This is by design — an audit log is only trustworthy if its records are immutable.
+This service records audit events in a permanent, queryable log. Events can be written and read, but they cannot be updated or deleted through the API. This is by design; an audit log is only trustworthy if its records are immutable.
 
 ## Setup & Configuration
 
@@ -33,7 +33,7 @@ Update `DATABASE_URL` in your `.env` file with your actual credentials:
 DATABASE_URL=postgres://postgres:yourpassword@localhost:5432/your_db_name
 ```
 
-Migrations run automatically when the server starts. A fresh, empty database is handled gracefully — the `events` table will be created on first run if it does not already exist.
+Migrations run automatically when the server starts. A fresh, empty database is handled gracefully; the `events` table will be created on first run if it does not already exist.
 
 ## Running the Server
 
@@ -156,8 +156,7 @@ Validation failure response:
 
 ### Persistence
 
- Events are stored in PostgreSQL.
- Every field is stored exactly as written. The database connection is configured through `DATABASE_URL` in the environment; nothing is hardcoded
+Events are stored in PostgreSQL. Every field is stored exactly as written. The database connection is configured through `DATABASE_URL` in the environment; nothing is hardcoded.
 
 ### Write-Only Design
 
@@ -183,4 +182,128 @@ curl -X DELETE http://localhost:3000/events
 }
 ```
 
-The Write-only design is intentional. An audit log exists to answer the question "what happened and who did it?" That question only has a reliable answer if the records cannot be quietly changed or removed after the fact. Write-only enforcement at the API level means no caller, regardless of permissions, can alter history through this service.
+The write-only design is intentional. An audit log exists to answer the question "what happened and who did it?" That question only has a reliable answer if the records cannot be quietly changed or removed after the fact. Write-only enforcement at the API level means no caller, regardless of permissions, can alter history through this service.
+
+## Phase 3 API
+
+### Querying Events
+
+Retrieve all events with `GET /events`. Without filters, all events are returned subject to pagination:
+
+```bash
+curl http://localhost:3000/events
+```
+
+Successful response:
+
+```json
+{
+  "ok": true,
+  "events": [
+    {
+      "id": "af8028a5-6720-4625-bd8c-3369ed33a02a",
+      "timestamp": "2026-06-27T13:01:42.194Z",
+      "actor_id": "user_123",
+      "action": "CREATE",
+      "resource_type": "document",
+      "resource_id": "doc-456",
+      "before_state": null,
+      "after_state": { "title": "My Doc" },
+      "ip_address": "::1",
+      "user_agent": "curl"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0,
+  "errors": []
+}
+```
+
+### Filtering
+
+Events can be filtered by `actor_id`, `action`, `resource_type`, `resource_id`, and a date range using `from` and `to`. Filters can be combined.
+
+```bash
+# Filter by actor
+curl http://localhost:3000/events?actor_id=user_123
+
+# Filter by action
+curl http://localhost:3000/events?action=DELETE
+
+# Filter by date range
+curl "http://localhost:3000/events?from=2026-06-01&to=2026-06-30"
+
+# Combined filters
+curl "http://localhost:3000/events?actor_id=user_123&action=DELETE&from=2026-06-01"
+```
+
+Date boundaries are inclusive — events whose timestamp falls exactly on `from` or `to` are included.
+
+### Pagination
+
+`GET /events` supports `limit` and `offset` query parameters. The default limit is `20` when none is supplied.
+
+```bash
+# First page
+curl http://localhost:3000/events?limit=10&offset=0
+
+# Second page
+curl http://localhost:3000/events?limit=10&offset=10
+```
+
+Requesting beyond the end of the data returns an empty list, not an error:
+
+```json
+{
+  "ok": true,
+  "events": [],
+  "total": 4,
+  "limit": 20,
+  "offset": 99999,
+  "errors": []
+}
+```
+
+### Retrieving a Single Event
+
+```bash
+curl http://localhost:3000/events/af8028a5-6720-4625-bd8c-3369ed33a02a
+```
+
+Successful response:
+
+```json
+{
+  "ok": true,
+  "event": {
+    "id": "af8028a5-6720-4625-bd8c-3369ed33a02a",
+    "timestamp": "2026-06-27T13:01:42.194Z",
+    "actor_id": "user_123",
+    "action": "CREATE",
+    "resource_type": "document",
+    "resource_id": "doc-456",
+    "before_state": null,
+    "after_state": { "title": "My Doc" },
+    "ip_address": null,
+    "user_agent": null
+  },
+  "errors": []
+}
+```
+
+Not found response:
+
+```json
+{
+  "ok": false,
+  "event": null,
+  "errors": [
+    {
+      "field": "id",
+      "message": "Event not found.",
+      "code": "NOT_FOUND"
+    }
+  ]
+}
+```

@@ -1,12 +1,14 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
 import { createEventSchema } from "../validators/event.validator";
-import { recordEvent } from "../services/events.service";
+import { recordEvent, fetchEvents, fetchEventById } from "../services/events.service";
 import {
   eventErrorResponse,
   eventSuccessResponse,
+  eventsSuccessResponse,
   type ApiError,
 } from "../utils/responses";
+import type { FilterType } from '../repositories/events.repository'
 
 function getValidationCode(issue: ZodError["issues"][number], body: unknown): string {
   const field = issue.path[0];
@@ -75,6 +77,64 @@ export async function createEvent(req: Request, res: Response) {
     return res.status(500).json(eventErrorResponse([{
       field: '',
       message: 'Failed to save event',
+      code: 'DATABASE_ERROR'
+    }]))
+  }
+}
+
+export async function getAllEvents(req: Request, res: Response) {
+  try {
+    const { actor_id, action, resource_type, resource_id, from, to, limit, offset } = req.query
+
+    const filters: FilterType = {}
+    if (typeof actor_id === 'string') filters.actor_id = actor_id
+    if (typeof action === 'string') filters.action = action
+    if (typeof resource_type === 'string') filters.resource_type = resource_type
+    if (typeof resource_id === 'string') filters.resource_id = resource_id
+    if (typeof from === 'string') filters.from = from
+    if (typeof to === 'string') filters.to = to
+    if (limit) filters.limit = Number(limit)
+    if (offset) filters.offset = Number(offset)
+
+    const result = await fetchEvents(filters)
+
+    return res.status(200).json(eventsSuccessResponse(result))
+  } catch (err) {
+    return res.status(500).json(eventErrorResponse([{
+      field: '',
+      message: 'Failed to fetch events',
+      code: 'DATABASE_ERROR'
+    }]))
+  }
+}
+
+export async function getEventById(req: Request, res: Response) {
+  try {
+   const id = Array.isArray(req.params['id']) ? req.params['id'][0] : req.params['id']
+
+    if (!id) {
+      return res.status(400).json(eventErrorResponse([{
+        field: 'id',
+        message: 'Event id is required.',
+        code: 'MISSING_FIELD'
+      }]))
+    }
+
+    const event = await fetchEventById(id)
+
+    if (!event) {
+      return res.status(404).json(eventErrorResponse([{
+        field: 'id',
+        message: 'Event not found.',
+        code: 'NOT_FOUND'
+      }]))
+    }
+
+    return res.status(200).json(eventSuccessResponse(event))
+  } catch (err) {
+    return res.status(500).json(eventErrorResponse([{
+      field: '',
+      message: 'Failed to fetch event',
       code: 'DATABASE_ERROR'
     }]))
   }

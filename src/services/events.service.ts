@@ -1,13 +1,14 @@
 import type { CreateEventInput } from "../validators/event.validator";
 import type { NewEvent, Event } from "../db/schema";
-import { psqlEventRepository } from "../repositories/events.repository";
+import { psqlEventRepository, getEvents, getEventById } from "../repositories/events.repository";
+import type { FilterType, QueryResult } from "../repositories/events.repository";
 
 type EventMeta = {
   ip_address: string | null;
   user_agent: string | null;
 }
 
-export async function recordEvent(input: CreateEventInput, meta: EventMeta): Promise<Event> {
+export const recordEvent = async (input: CreateEventInput, meta: EventMeta): Promise<Event> => {
   const event: NewEvent = {
     actor_id: input.actor_id,
     action: input.action,
@@ -17,8 +18,16 @@ export async function recordEvent(input: CreateEventInput, meta: EventMeta): Pro
     after_state: input.after_state ?? null,
     ip_address: meta.ip_address,
     user_agent: meta.user_agent,
-    signature: '', // placeholder — HMAC signing comes in next phase
+    signature: '',
   };
 
   return await psqlEventRepository(event);
+}
+
+export const fetchEvents = async (filters: FilterType): Promise<QueryResult> => {
+  return await getEvents(filters)
+}
+
+export const fetchEventById = async (id: string): Promise<Event | null> => {
+  return await getEventById(id)
 }
