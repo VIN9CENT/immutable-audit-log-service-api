@@ -1,0 +1,421 @@
+openapi: 3.0.3
+info:
+  title: Immutable Audit Log Service
+  description: A REST API service that records audit events into a permanent, queryable log. Events can be written and read, but never updated or deleted.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns the current status of the service.
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: OK
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: 2026-06-28T10:15:30.123Z
+                  service:
+                    type: string
+                    example: Immutable Audit Log Service API
+
+  /events:
+    get:
+      summary: Query events
+      description: Returns a paginated, filterable list of audit events.
+      parameters:
+        - name: actor_id
+          in: query
+          schema:
+            type: string
+          description: Filter by actor ID
+        - name: action
+          in: query
+          schema:
+            type: string
+          description: Filter by action
+        - name: resource_type
+          in: query
+          schema:
+            type: string
+          description: Filter by resource type
+        - name: resource_id
+          in: query
+          schema:
+            type: string
+          description: Filter by resource ID
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter events from this timestamp (inclusive)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter events up to this timestamp (inclusive)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Maximum number of events to return (default 20)
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Number of events to skip
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  total:
+                    type: integer
+                    example: 42
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+                  errors:
+                    type: array
+                    items: {}
+                    example: []
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      summary: Record an event
+      description: Records a single audit event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventInput'
+      responses:
+        '201':
+          description: Event recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  event:
+                    $ref: '#/components/schemas/Event'
+                  errors:
+                    type: array
+                    items: {}
+                    example: []
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /events/bulk:
+    post:
+      summary: Record a batch of events
+      description: Records multiple audit events atomically. Either all events are written or none are.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              maxItems: 100
+              items:
+                $ref: '#/components/schemas/CreateEventInput'
+      responses:
+        '201':
+          description: All events recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  inserted:
+                    type: integer
+                    example: 3
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  errors:
+                    type: array
+                    items: {}
+                    example: []
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /events/{id}:
+    get:
+      summary: Get a single event
+      description: Returns a single audit event by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The event UUID
+      responses:
+        '200':
+          description: Event found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  event:
+                    $ref: '#/components/schemas/Event'
+                  errors:
+                    type: array
+                    items: {}
+                    example: []
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /events/{id}/verify:
+    get:
+      summary: Verify event integrity
+      description: Recomputes the HMAC signature for the stored event and reports whether the record is intact or has been tampered with.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The event UUID
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  intact:
+                    type: boolean
+                    description: true if the event has not been tampered with
+                    example: true
+                  event:
+                    $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  schemas:
+    CreateEventInput:
+      type: object
+      required:
+        - actor_id
+        - action
+        - resource_type
+        - resource_id
+      properties:
+        actor_id:
+          type: string
+          minLength: 1
+          example: user_123
+        action:
+          type: string
+          minLength: 1
+          example: UPDATE
+        resource_type:
+          type: string
+          minLength: 1
+          example: product
+        resource_id:
+          type: string
+          minLength: 1
+          example: product_456
+        before_state:
+          type: object
+          nullable: true
+          additionalProperties: true
+          example: { "price": 10 }
+        after_state:
+          type: object
+          nullable: true
+          additionalProperties: true
+          example: { "price": 15 }
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: af8028a5-6720-4625-bd8c-3369ed33a02a
+        timestamp:
+          type: string
+          format: date-time
+          example: 2026-06-28T10:15:30.123Z
+        actor_id:
+          type: string
+          example: user_123
+        action:
+          type: string
+          example: UPDATE
+        resource_type:
+          type: string
+          example: product
+        resource_id:
+          type: string
+          example: product_456
+        before_state:
+          type: object
+          nullable: true
+          example: { "price": 10 }
+        after_state:
+          type: object
+          nullable: true
+          example: { "price": 15 }
+        ip_address:
+          type: string
+          nullable: true
+          example: "::1"
+        user_agent:
+          type: string
+          nullable: true
+          example: PostmanRuntime/7.49.1
+
+    ApiError:
+      type: object
+      properties:
+        field:
+          type: string
+          example: actor_id
+        message:
+          type: string
+          example: actor_id is required.
+        code:
+          type: string
+          example: MISSING_FIELD
+
+  responses:
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              event:
+                nullable: true
+                example: null
+              errors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiError'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              event:
+                nullable: true
+                example: null
+              errors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiError'
+
+    MethodNotAllowed:
+      description: Method not allowed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              event:
+                nullable: true
+                example: null
+              errors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiError'
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              event:
+                nullable: true
+                example: null
+              errors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiError'

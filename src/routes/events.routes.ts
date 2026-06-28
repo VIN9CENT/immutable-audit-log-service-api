@@ -1,20 +1,25 @@
 import { Router } from "express";
-import { createEvent, getAllEvents, getEventById , createBulkEvents} from "../controllers/events.controller";
+import { createEvent, getAllEvents, getEventById, createBulkEvents, verifyEventById } from "../controllers/events.controller";
 import { methodNotAllowed } from "../middlewares/method-not-allowed.middleware";
 
 const router = Router();
 
-router.post("/", createEvent);
-router.post("/bulk", createBulkEvents);
-router.get("/", getAllEvents);
-router.get("/:id", getEventById);
+
+router.route("/")
+  .get(getAllEvents)
+  .post(createEvent)
+  .all(methodNotAllowed); 
+router.route("/:id/verify")
+  .get(verifyEventById)
+  .all(methodNotAllowed)
+
+router.route("/bulk")
+  .post(createBulkEvents)
+  .all(methodNotAllowed); 
 
 
-router.put("/", methodNotAllowed);
-router.patch("/", methodNotAllowed);
-router.delete("/", methodNotAllowed);
-router.put("/:id", methodNotAllowed);
-router.patch("/:id", methodNotAllowed);
-router.delete("/:id", methodNotAllowed);
+router.route("/:id")
+  .get(getEventById)
+  .all(methodNotAllowed); 
 
 export default router;
