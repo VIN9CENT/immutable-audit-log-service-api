@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
 import {
-  createBulkEventSchema,
   createEventSchema,
 } from "../validators/event.validator";
 import {
