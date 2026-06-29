@@ -493,6 +493,6 @@ Verification recomputes the HMAC from the stored fields and compares it against 
 
 ## Known Limitations
 
-- The service has no authentication or authorization. Any caller can write events and read the log. The `actor_id` field is taken at face value — the service has no way to verify that the caller is who they claim to be. In production, this service should sit behind an API gateway or require a shared secret header to restrict access to trusted internal services only.
+- Authentication of individual actors is the responsibility of the calling service.
 - The service is not currently deployed. All endpoints run on `localhost:3000` only.
 - HMAC signing detects tampering after the fact but cannot detect a caller that intentionally writes false event data.
