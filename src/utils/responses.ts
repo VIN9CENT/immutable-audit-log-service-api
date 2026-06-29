@@ -41,3 +41,12 @@ export function eventsSuccessResponse(result: QueryResult) {
     errors: [],
   }
 }
+
+export function bulkEventSuccessResponse(events: Event[]) {
+  return {
+    ok: true,
+    inserted: events.length,
+    events: events.map(({ signature: _signature, ...safeEvent }) => safeEvent),
+    errors: [],
+  }
+}
