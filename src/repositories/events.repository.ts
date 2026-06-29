@@ -1,7 +1,7 @@
 import { db } from "../db/connection";
 import { events } from "../db/schema";
 import type { NewEvent, Event } from "../db/schema";
-import { eq, and, gte, lte, count } from "drizzle-orm";
+import { eq, and, gte, lte, count, asc } from "drizzle-orm";
 
 export interface FilterType {
   actor_id?: string | undefined;
@@ -13,11 +13,13 @@ export interface FilterType {
   limit?: number | undefined;
   offset?: number | undefined;
 }
+
 export interface QueryResult {
   events: Event[];
   total: number;
   limit: number;
   offset: number;
+  has_more: boolean;
 }
 
 export const psqlEventRepository = async (event: NewEvent): Promise<Event> => {
@@ -36,7 +38,7 @@ export const psqlBulkEventRepository = async (
 };
 
 export const getEvents = async (filters: FilterType): Promise<QueryResult> => {
-  const limit = filters.limit ?? 20;
+  const limit = Math.min(filters.limit ?? 20, 100)
   const offset = filters.offset ?? 0;
 
   const conditions = [
@@ -73,15 +75,18 @@ export const getEvents = async (filters: FilterType): Promise<QueryResult> => {
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [rows, countResult] = await Promise.all([
-    db.select().from(events).where(where).limit(limit).offset(offset),
+    db.select().from(events).where(where).orderBy(asc(events.timestamp)).limit(limit).offset(offset),
     db.select({ count: count() }).from(events).where(where),
   ]);
 
+  const total = Number(countResult[0]?.count ?? 0)
+
   return {
     events: rows,
-    total: Number(countResult[0]?.count ?? 0),
+    total,
     limit,
     offset,
+    has_more: offset + limit < total,
   };
 };
 

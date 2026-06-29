@@ -111,28 +111,62 @@ export async function createEvent(req: Request, res: Response) {
 }
 
 export const createBulkEvents = async (req: Request, res: Response) => {
-  const result = createBulkEventSchema.safeParse(req.body);
-  if (!result.success) {
-    return res
-      .status(400)
-      .json(eventErrorResponse(formatValidationErrors(result.error, req.body)));
+  if (!Array.isArray(req.body)) {
+    return res.status(400).json(eventErrorResponse([{
+      field: 'body',
+      message: 'Request body must be an array.',
+      code: 'INVALID_TYPE',
+    }]))
+  }
+
+  if (req.body.length === 0) {
+    return res.status(400).json(eventErrorResponse([{
+      field: 'body',
+      message: 'Batch must contain at least one event.',
+      code: 'EMPTY_BATCH',
+    }]))
+  }
+
+  if (req.body.length > 100) {
+    return res.status(400).json(eventErrorResponse([{
+      field: 'body',
+      message: 'Batch cannot exceed 100 events.',
+      code: 'BATCH_TOO_LARGE',
+    }]))
+  }
+
+  const allErrors: ApiError[] = []
+
+  for (let i = 0; i < req.body.length; i++) {
+    const result = createEventSchema.safeParse(req.body[i])
+    if (!result.success) {
+      const errors = formatValidationErrors(result.error, req.body[i])
+      errors.forEach((error) => {
+        allErrors.push({
+          ...error,
+          field: `${i}.${error.field}`,
+        })
+      })
+    }
+  }
+
+  if (allErrors.length > 0) {
+    return res.status(400).json(eventErrorResponse(allErrors))
   }
 
   try {
-    const events = await recordBulkEvents(result.data, {
+    const events = await recordBulkEvents(req.body, {
       ip_address: req.ip ?? req.socket.remoteAddress ?? null,
       user_agent: req.headers["user-agent"] ?? null,
     });
     return res.status(201).json(bulkEventSuccessResponse(events));
   } catch (err) {
     return res.status(500).json(
-      eventErrorResponse([
-        {
-          field: "",
-          message: "Failed to save events",
-          code: "DATABASE_ERROR",
-        },
-      ]),
+      eventErrorResponse([{
+        field: "",
+        message: "Failed to save events",
+        code: "DATABASE_ERROR",
+      }]),
     );
   }
 };
