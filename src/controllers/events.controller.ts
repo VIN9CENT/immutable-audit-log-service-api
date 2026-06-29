@@ -1,15 +1,7 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
-import {
-  createEventSchema,
-} from "../validators/event.validator";
-import {
-  recordEvent,
-  fetchEvents,
-  fetchEventById,
-  recordBulkEvents,
-  verifyEvent,
-} from "../services/events.service";
+import { createBulkEventSchema, createEventSchema } from "../validators/event.validator";
+import { recordEvent, fetchEvents, fetchEventById, recordBulkEvents } from "../services/events.service";
 import {
   eventErrorResponse,
   eventSuccessResponse,
