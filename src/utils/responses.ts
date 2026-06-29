@@ -1,4 +1,4 @@
-import type { StoredEvent } from "../types/event";
+import type { Event } from "../db/schema";
 
 export type ApiError = {
   field: string;
@@ -6,16 +6,19 @@ export type ApiError = {
   code: string;
 };
 
+export type SafeEvent = Omit<Event, 'signature'>
+
 export type EventResponse = {
   ok: boolean;
-  event: StoredEvent | null;
+  event: SafeEvent | null;
   errors: ApiError[];
 };
 
-export function eventSuccessResponse(event: StoredEvent): EventResponse {
+export function eventSuccessResponse(event: Event): EventResponse {
+  const { signature, ...safeEvent } = event
   return {
     ok: true,
-    event,
+    event: safeEvent,
     errors: [],
   };
 }

@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
@@ -22,8 +22,11 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.0.1",
     "@types/pg": "^8.20.0",
+    "@types/supertest": "^7.2.0",
     "drizzle-kit": "^0.31.10",
+    "supertest": "^7.2.2",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

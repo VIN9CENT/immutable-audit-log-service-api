@@ -2,7 +2,7 @@
 
 ## What This Service Does
 
-This service records audit events in a permanent, queryable log. Events can be written and read, but they should not be updated or deleted through the API.
+This service records audit events in a permanent, queryable log. Events can be written and read, but they cannot be updated or deleted through the API. This is by design — an audit log is only trustworthy if its records are immutable.
 
 ## Setup & Configuration
 
@@ -16,6 +16,24 @@ SERVER_SECRET=replace-with-a-long-random-secret
 ```
 
 `PORT`, `DATABASE_URL`, and `SERVER_SECRET` are read from the environment instead of being hardcoded.
+
+## Database Setup
+
+This service requires a running PostgreSQL instance. Create the database before starting the server:
+
+```bash
+createdb your_db_name
+```
+
+Or create it through pgAdmin: right-click **Databases → Create → Database** and name it `your_db_name`.
+
+Update `DATABASE_URL` in your `.env` file with your actual credentials:
+
+```bash
+DATABASE_URL=postgres://postgres:yourpassword@localhost:5432/your_db_name
+```
+
+Migrations run automatically when the server starts. A fresh, empty database is handled gracefully — the `events` table will be created on first run if it does not already exist.
 
 ## Running the Server
 
@@ -64,9 +82,7 @@ Clients may send these fields when recording an event:
   },
   "after_state": {
     "status": "deleted"
-  },
-  "ip_address": "127.0.0.1",
-  "user_agent": "curl"
+  }
 }
 ```
 
@@ -81,10 +97,10 @@ Optional fields:
 
 - `before_state`
 - `after_state`
-- `ip_address`
-- `user_agent`
 
 The client must not choose `id` or `timestamp`. The server assigns both when the event is written. Timestamps use ISO 8601 UTC format, for example `2026-06-26T10:15:30.123Z`.
+
+`ip_address` and `user_agent` are captured automatically from the incoming request. The client cannot provide or override these values. This ensures rogue clients cannot provide wrong `ip_address` and `user_agent`.
 
 ### Recording an Event
 
@@ -110,7 +126,11 @@ Successful response:
     "actor_id": "user_123",
     "action": "delete",
     "resource_type": "invoice",
-    "resource_id": "inv_456"
+    "resource_id": "inv_456",
+    "before_state": null,
+    "after_state": null,
+    "ip_address": null,
+    "user_agent": null
   },
   "errors": []
 }
@@ -131,3 +151,36 @@ Validation failure response:
   ]
 }
 ```
+
+## Phase 2 API
+
+### Persistence
+
+ Events are stored in PostgreSQL.
+ Every field is stored exactly as written. The database connection is configured through `DATABASE_URL` in the environment; nothing is hardcoded
+
+### Write-Only Design
+
+The API deliberately exposes no way to update or delete an event once it has been written. There are no `PUT`, `PATCH`, or `DELETE` routes. There are no query parameters or flags that re-enable editing or deletion.
+
+Sending a disallowed method to an events route returns `405 Method Not Allowed`:
+
+```bash
+curl -X DELETE http://localhost:3000/events
+```
+
+```json
+{
+  "ok": false,
+  "event": null,
+  "errors": [
+    {
+      "field": "",
+      "message": "Method not allowed.",
+      "code": "METHOD_NOT_ALLOWED"
+    }
+  ]
+}
+```
+
+The Write-only design is intentional. An audit log exists to answer the question "what happened and who did it?" That question only has a reliable answer if the records cannot be quietly changed or removed after the fact. Write-only enforcement at the API level means no caller, regardless of permissions, can alter history through this service.
