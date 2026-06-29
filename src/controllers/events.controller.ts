@@ -1,5 +1,15 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
+import {
+  createEventSchema,
+} from "../validators/event.validator";
+import {
+  recordEvent,
+  fetchEvents,
+  fetchEventById,
+  recordBulkEvents,
+  verifyEvent,
+} from "../services/events.service";
 import { createBulkEventSchema, createEventSchema } from "../validators/event.validator";
 import { recordEvent, fetchEvents, fetchEventById, recordBulkEvents } from "../services/events.service";
 import {
@@ -280,37 +290,5 @@ export async function getEventById(req: Request, res: Response) {
         },
       ]),
     );
-  }
-}
-
-export async function getEventById(req: Request, res: Response) {
-  try {
-   const id = Array.isArray(req.params['id']) ? req.params['id'][0] : req.params['id']
-
-    if (!id) {
-      return res.status(400).json(eventErrorResponse([{
-        field: 'id',
-        message: 'Event id is required.',
-        code: 'MISSING_FIELD'
-      }]))
-    }
-
-    const event = await fetchEventById(id)
-
-    if (!event) {
-      return res.status(404).json(eventErrorResponse([{
-        field: 'id',
-        message: 'Event not found.',
-        code: 'NOT_FOUND'
-      }]))
-    }
-
-    return res.status(200).json(eventSuccessResponse(event))
-  } catch (err) {
-    return res.status(500).json(eventErrorResponse([{
-      field: '',
-      message: 'Failed to fetch event',
-      code: 'DATABASE_ERROR'
-    }]))
   }
 }
