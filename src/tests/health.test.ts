@@ -12,3 +12,4 @@ describe('GET /health', () => {
     expect(res.body.service).toBeDefined()
   })
 })
+
