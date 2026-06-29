@@ -57,6 +57,24 @@ DATABASE_URL=postgres://postgres:yourpassword@localhost:5432/your_db_name
 
 Migrations run automatically when the server starts. A fresh, empty database is handled gracefully — the `events` table will be created on first run if it does not already exist.
 
+## Database Setup
+
+This service requires a running PostgreSQL instance. Create the database before starting the server:
+
+```bash
+createdb your_db_name
+```
+
+Or create it through pgAdmin: right-click **Databases → Create → Database** and name it `your_db_name`.
+
+Update `DATABASE_URL` in your `.env` file with your actual credentials:
+
+```bash
+DATABASE_URL=postgres://postgres:yourpassword@localhost:5432/your_db_name
+```
+
+Migrations run automatically when the server starts. A fresh, empty database is handled gracefully; the `events` table will be created on first run if it does not already exist.
+
 ## Running the Server
 
 Start the development server with:
